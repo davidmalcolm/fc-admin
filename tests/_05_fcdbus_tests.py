@@ -320,8 +320,8 @@ class TestDbusService(unittest.TestCase):
     def test_11_list_domains(self):
         # Try to get domains without configuring hypervisor
         resp = self.c.list_domains()
-        self.assertFalse(resp['status'])
-        self.assertEqual(resp['error'], 'Error retrieving domains')
+        self.assertTrue(resp['status'])
+        self.assertEqual(resp['domains'], [])
 
         # Configure hypervisor
         self.configure_hypervisor()

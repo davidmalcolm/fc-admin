@@ -255,10 +255,13 @@ class FleetCommanderDbusService(dbus.service.Object):
         """
         Get a libvirtcontroller instance
         """
-        hypervisor = self.db.config['hypervisor']
-        return libvirtcontroller.LibVirtController(
-            self.state_dir, hypervisor['username'],
-            hypervisor['host'], hypervisor['mode'])
+        if 'hypervisor' in self.db.config:
+            hypervisor = self.db.config['hypervisor']
+            return libvirtcontroller.LibVirtController(
+                self.state_dir, hypervisor['username'],
+                hypervisor['host'], hypervisor['mode'])
+        else:
+            return None
 
     def get_public_key(self):
         # Initialize LibVirtController to create keypair if needed
@@ -292,11 +295,14 @@ class FleetCommanderDbusService(dbus.service.Object):
         while tries < self.LIST_DOMAINS_RETRIES:
             tries += 1
             try:
-                domains = self.get_libvirt_controller().list_domains()
-                if only_temporary:
-                    domains = [d for d in domains if d['temporary']]
-                logging.debug('Domains retrieved: %s' % domains)
-                return domains
+                libvirtctrlr = self.get_libvirt_controller()
+                if libvirtctrlr is not None:
+                    domains = libvirtctrlr.list_domains()
+                    if only_temporary:
+                        domains = [d for d in domains if d['temporary']]
+                    logging.debug('Domains retrieved: %s' % domains)
+                    return domains
+                return []
             except Exception as e:
                 error = e
                 logging.debug(
@@ -367,14 +373,15 @@ class FleetCommanderDbusService(dbus.service.Object):
                     self.stop_current_session()
                 for domain in domains:
                     ctrlr = self.get_libvirt_controller()
-                    domain_uuid = domain['uuid']
-                    if current_uuid != domain_uuid:
-                        try:
-                            ctrlr.session_stop(domain_uuid)
-                        except Exception, e:
-                            logging.error(
-                                'Error destroying session with UUID %s: %s' %
-                                (domain_uuid, e))
+                    if ctrlr is not None:
+                        domain_uuid = domain['uuid']
+                        if current_uuid != domain_uuid:
+                            try:
+                                ctrlr.session_stop(domain_uuid)
+                            except Exception, e:
+                                logging.error(
+                                    'Error destroying session with UUID %s: %s' %
+                                    (domain_uuid, e))
             if time.time() - self._last_call_time > self.auto_quit_timeout:
                 # Quit service
                 logging.debug(
